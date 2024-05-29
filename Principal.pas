@@ -13,7 +13,7 @@ type
     OpenDialog1: TOpenDialog;
     GroupBox1: TGroupBox;
     GroupBox2: TGroupBox;
-    bntLerArquivo: TButton;
+    btnLerArquivo: TButton;
     EditCaminho: TEdit;
     btnImportar: TButton;
     EditCaminhoDb: TEdit;
@@ -23,45 +23,37 @@ type
     EditSenha: TEdit;
     OpenDialog2: TOpenDialog;
     EditServer: TEdit;
-    BtnSalvar: TButton;
+    btnSalvar: TButton;
     DBGrid1: TDBGrid;
     DataSource1: TDataSource;
-    procedure bntLerArquivoClick(Sender: TObject);
+    btnProcurarArquivo: TButton;
     procedure btnBancoClick(Sender: TObject);
-    procedure BtnSalvarClick(Sender: TObject);
-
+    procedure btnSalvarClick(Sender: TObject);
+    procedure EditNomeTabelaExit(Sender: TObject);
+    procedure btnProcurarArquivoClick(Sender: TObject);
+    procedure btnLerArquivoClick(Sender: TObject);
+    procedure btnImportarClick(Sender: TObject);
+    procedure DBGrid1DblClick(Sender: TObject);
   private
     { Private declarations }
-    Procedure Geralog(_AMensagem: string);
-    procedure LerArquivo(_ACaminho: string);
+    procedure LerArquivoMontarCreate(_ACaminho: string);
     function MontarCreate(_ALinha: string): string;
+    function MontarInsert(_ALinha: string): string;
   public
     { Public declarations }
     TipoDados: string;
+    Procedure Geralog(Sender: TObject;_AMensagem: string);
   end;
 
 var
   frmPrincipal: TfrmPrincipal;
+  ASQLInsert: string;
 
 implementation
 
 {$R *.dfm}
 
 uses UDM, UTipoDados;
-
-procedure TfrmPrincipal.bntLerArquivoClick(Sender: TObject);
-begin
-  if OpenDialog1.execute then
-    EditCaminho.text := OpenDialog1.filename;
-
-  if ((EditCaminho.text <> EmptyStr) and
-    (EditNomeTabela.text <> 'Nome da Tabela')) then
-    LerArquivo(EditCaminho.text)
-  else
-    ShowMessage
-      ('Adicione o caminho do arquivo e o nome da tabela que deseja criar')
-
-end;
 
 procedure TfrmPrincipal.btnBancoClick(Sender: TObject);
 begin
@@ -87,7 +79,56 @@ begin
 
 end;
 
-procedure TfrmPrincipal.BtnSalvarClick(Sender: TObject);
+procedure TfrmPrincipal.btnImportarClick(Sender: TObject);
+var
+  arquivoCSV: TextFile;
+  linha: string;
+begin
+  try
+  if EditCaminho.text = EmptyStr then
+  begin
+    ShowMessage('Aquivo CSV não encontrado');
+    Exit;
+  end;
+    AssignFile(arquivoCSV, EditCaminho.text);
+    Reset(arquivoCSV);
+    Readln(arquivoCSV, linha);
+    ASQLInsert := 'insert table ' + EditNomeTabela.text + '(' + linha;
+    while not Eof(arquivoCSV) do
+    begin
+      Readln(arquivoCSV, linha);
+      MontarInsert(linha);
+    end;
+    CloseFile(arquivoCSV);
+  Except
+    on E: Exception do
+    begin
+      Geralog(Sender, E.Message);
+      ShowMessage('Erro ao executar comando de creação da tabela ' + E.Message);
+      Close;
+    end;
+
+  end;
+end;
+
+procedure TfrmPrincipal.btnLerArquivoClick(Sender: TObject);
+begin
+  if ((EditCaminho.text <> EmptyStr) and (EditNomeTabela.text <> EmptyStr)) then
+    LerArquivoMontarCreate(EditCaminho.text)
+  else
+  begin
+    EditNomeTabela.text := EmptyStr;
+    EditNomeTabela.SetFocus;
+  end;
+end;
+
+procedure TfrmPrincipal.btnProcurarArquivoClick(Sender: TObject);
+begin
+  if OpenDialog1.execute then
+    EditCaminho.text := OpenDialog1.filename;
+end;
+
+procedure TfrmPrincipal.btnSalvarClick(Sender: TObject);
 var
   ArquivoINI: TIniFile;
   ACaminhoINI: string;
@@ -106,36 +147,52 @@ begin
   end;
 end;
 
-procedure TfrmPrincipal.Geralog(_AMensagem: string);
+procedure TfrmPrincipal.DBGrid1DblClick(Sender: TObject);
+begin
+  EditNomeTabela.text := DM.FDQueryBancoRDBRELATION_NAME.AsString;
+  btnImportar.Enabled := True;
+end;
+
+procedure TfrmPrincipal.EditNomeTabelaExit(Sender: TObject);
+begin
+  if EditNomeTabela.text <> EmptyStr then
+  begin
+    btnLerArquivo.Enabled := True;
+    btnImportar.Enabled := True;
+  end;
+
+end;
+
+procedure TfrmPrincipal.Geralog(Sender: TObject;_AMensagem: string);
 var
   ACaminho: string;
   APath: string;
-  Arq: TextFile;
+  arq: TextFile;
+  ClassRef: TComponent;
 begin
+  ClassRef := TComponent(Sender).Components[0].Owner;
   ACaminho := ExtractFileDir(GetCurrentDir);
   APath := ACaminho + '\arquivo.log';
 
-  AssignFile(Arq, APath);
+  AssignFile(arq, APath);
   if not FileExists(APath) then
-    Rewrite(Arq, APath);
-  Append(Arq);
+    Rewrite(arq, APath);
+  Append(arq);
 
-  Writeln(Arq, _AMensagem);
-  Writeln(Arq, '');
-  CloseFile(Arq);
+  Writeln(arq,ClassRef.ToString +'-'+ _AMensagem);
+  Writeln(arq, '');
+  CloseFile(arq);
 end;
 
-procedure TfrmPrincipal.LerArquivo(_ACaminho: string);
+procedure TfrmPrincipal.LerArquivoMontarCreate(_ACaminho: string);
 var
   arquivoCSV: TextFile;
   linha: string;
 begin
-
   AssignFile(arquivoCSV, _ACaminho);
   Reset(arquivoCSV);
   Readln(arquivoCSV, linha);
   MontarCreate(linha);
-
 end;
 
 function TfrmPrincipal.MontarCreate(_ALinha: string): string;
@@ -153,6 +210,8 @@ begin
   begin
     if Asaida.Count >= 1 then
     begin
+      if Asaida[I] = 'date' then
+        Asaida[I] := 'data';
       FTipoDados.Dados := Asaida[I];
       FTipoDados.ShowModal;
       if I < Asaida.Count - 1 then
@@ -162,7 +221,7 @@ begin
     end;
   end;
   try
-    Geralog(ASQLCreate);
+    Geralog(nil, ASQLCreate);
     DM.FDQuery1.Close;
     DM.FDQuery1.SQL.Add(ASQLCreate);
     DM.FDQuery1.ExecSQL;
@@ -170,11 +229,47 @@ begin
   Except
     on E: Exception do
     begin
-      Geralog(E.Message);
+      Geralog(nil, E.Message);
       ShowMessage('Erro ao executar comando de creação da tabela ' + E.Message);
       Close;
     end;
   end;
+end;
+
+function TfrmPrincipal.MontarInsert(_ALinha: string): string;
+var
+  Asaida: TStrings;
+  I: Integer;
+begin
+  Asaida := TStringList.Create;
+  ASQLInsert := ASQLInsert + 'values(';
+  ExtractStrings([','], [], PChar(_ALinha), Asaida);
+
+  for I := 0 to Asaida.Count - 1 do
+  begin
+    if Asaida.Count >= 1 then
+    begin
+      if I < Asaida.Count - 1 then
+        ASQLInsert := ASQLInsert + Asaida[I] + ', '
+      else
+        ASQLInsert := ASQLInsert + Asaida[I] + ') ';
+    end;
+  end;
+  try
+    Geralog(nil, ASQLInsert);
+    DM.FDQuery1.Close;
+    DM.FDQuery1.SQL.Add(ASQLInsert);
+    DM.FDQuery1.ExecSQL;
+
+  Except
+    on E: Exception do
+    begin
+      Geralog(nil, E.Message);
+      ShowMessage('Erro ao executar comando de insert da tabela ' + E.Message);
+      Close;
+    end;
+  end;
+
 end;
 
 end.

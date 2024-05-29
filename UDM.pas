@@ -16,11 +16,12 @@ type
     FDPhysFBDriverLink1: TFDPhysFBDriverLink;
     FDQuery1: TFDQuery;
     FDQueryBanco: TFDQuery;
+    FDQueryBancoRDBRELATION_NAME: TWideStringField;
     procedure DataModuleCreate(Sender: TObject);
   private
     procedure LerEConectar(var ArquivoINI: TIniFile);
     procedure IniciaArquivoINI;
-    procedure GetTabelasBase;
+    procedure LerTabelasBD;
     { Private declarations }
   public
     { Public declarations }
@@ -39,7 +40,7 @@ uses Principal;
 procedure TDm.DataModuleCreate(Sender: TObject);
 begin
   IniciaArquivoINI;
-
+  LerTabelasBD;
 end;
 
 procedure TDm.LerEConectar(var ArquivoINI: TIniFile);
@@ -64,14 +65,30 @@ begin
       'Servidor', '');
     frmPrincipal.EditCaminhoDb.Text := ArquivoINI.ReadString('BANCO',
       'BancoDados', '');
+    frmPrincipal.EditUsuario.Text := ArquivoINI.ReadString('BANCO',
+      'Usuario', '');
+    frmPrincipal.EditSenha.Text := ArquivoINI.ReadString('BANCO', 'Senha', '');
   end;
 
 end;
 
-procedure TDm.GetTabelasBase;
+procedure TDm.LerTabelasBD;
+var
+  APrincipal: TfrmPrincipal;
 begin
-  FDQueryBanco.Close;
-  FDQueryBanco.Open();
+  try
+    FDQueryBanco.Close;
+    FDQueryBanco.SQL.Clear;
+    FDQueryBanco.SQL.Add('SELECT RDB$RELATION_NAME FROM RDB$RELATIONS WHERE RDB$VIEW_BLR IS NULL AND (RDB$SYSTEM_FLAG = 0 OR RDB$SYSTEM_FLAG IS NULL);');
+    FDQueryBanco.Open();
+  Except
+    on E: Exception do
+    begin
+      APrincipal:= TfrmPrincipal.Create(nil);
+      APrincipal.Geralog(E.Message);
+    end;
+  end;
+
 end;
 
 procedure TDm.IniciaArquivoINI;

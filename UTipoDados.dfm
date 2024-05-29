@@ -2,8 +2,8 @@ object FTipoDados: TFTipoDados
   Left = 0
   Top = 0
   Caption = 'Tipo de dados'
-  ClientHeight = 351
-  ClientWidth = 280
+  ClientHeight = 350
+  ClientWidth = 276
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -26,6 +26,7 @@ object FTipoDados: TFTipoDados
       Height = 23
       TabOrder = 0
       Text = 'Tipo Dados'
+      OnChange = ComboBoxTipoDadosChange
       Items.Strings = (
         'Varchar'
         'Integer'
