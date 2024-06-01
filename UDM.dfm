@@ -1,6 +1,6 @@
 object Dm: TDm
   OnCreate = DataModuleCreate
-  Height = 229
+  Height = 250
   Width = 293
   object FDConnection1: TFDConnection
     Params.Strings = (
@@ -21,7 +21,7 @@ object Dm: TDm
     Left = 48
     Top = 112
   end
-  object FDQuery1: TFDQuery
+  object FDQueryMontarSQL: TFDQuery
     Connection = FDConnection1
     Left = 200
     Top = 24
@@ -36,6 +36,28 @@ object Dm: TDm
     Left = 200
     Top = 120
     object FDQueryBancoRDBRELATION_NAME: TWideStringField
+      FieldName = 'RDB$RELATION_NAME'
+      Origin = 'RDB$RELATION_NAME'
+      FixedChar = True
+      Size = 31
+    end
+  end
+  object FDQueryColunas: TFDQuery
+    Connection = FDConnection1
+    SQL.Strings = (
+      'select rdb$field_name from rdb$relation_fields'
+      'where rdb$relation_name=:pTabela;')
+    Left = 200
+    Top = 184
+    ParamData = <
+      item
+        Name = 'PTABELA'
+        DataType = ftFixedWideChar
+        ParamType = ptInput
+        Size = 31
+        Value = Null
+      end>
+    object WideStringField1: TWideStringField
       FieldName = 'RDB$RELATION_NAME'
       Origin = 'RDB$RELATION_NAME'
       FixedChar = True

@@ -14,9 +14,11 @@ type
   TDm = class(TDataModule)
     FDConnection1: TFDConnection;
     FDPhysFBDriverLink1: TFDPhysFBDriverLink;
-    FDQuery1: TFDQuery;
+    FDQueryMontarSQL: TFDQuery;
     FDQueryBanco: TFDQuery;
     FDQueryBancoRDBRELATION_NAME: TWideStringField;
+    FDQueryColunas: TFDQuery;
+    WideStringField1: TWideStringField;
     procedure DataModuleCreate(Sender: TObject);
   private
     procedure LerEConectar(var ArquivoINI: TIniFile);
@@ -85,7 +87,7 @@ begin
     on E: Exception do
     begin
       APrincipal:= TfrmPrincipal.Create(nil);
-      APrincipal.Geralog(E.Message);
+      APrincipal.Geralog('LerTabelasBD',E.Message);
     end;
   end;
 

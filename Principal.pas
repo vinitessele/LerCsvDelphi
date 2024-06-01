@@ -34,20 +34,23 @@ type
     procedure btnLerArquivoClick(Sender: TObject);
     procedure btnImportarClick(Sender: TObject);
     procedure DBGrid1DblClick(Sender: TObject);
+    procedure FormShow(Sender: TObject);
   private
     { Private declarations }
     procedure LerArquivoMontarCreate(_ACaminho: string);
     function MontarCreate(_ALinha: string): string;
     function MontarInsert(_ALinha: string): string;
+    function IsNumeric(const Value: string): Boolean;
   public
     { Public declarations }
     TipoDados: string;
-    Procedure Geralog(Sender: TObject;_AMensagem: string);
+    Procedure Geralog(_AOrigem, _AMensagem: string);
   end;
 
 var
   frmPrincipal: TfrmPrincipal;
   ASQLInsert: string;
+  ATabelaExistente: Boolean;
 
 implementation
 
@@ -83,17 +86,48 @@ procedure TfrmPrincipal.btnImportarClick(Sender: TObject);
 var
   arquivoCSV: TextFile;
   linha: string;
+  OriginalString, SubStringToFind, SubStringToReplace: string;
+  I: Integer;
 begin
   try
-  if EditCaminho.text = EmptyStr then
-  begin
-    ShowMessage('Aquivo CSV não encontrado');
-    Exit;
-  end;
+
+    if EditCaminho.text = EmptyStr then
+    begin
+      ShowMessage('Aquivo CSV não encontrado');
+      Exit;
+    end;
+
     AssignFile(arquivoCSV, EditCaminho.text);
     Reset(arquivoCSV);
     Readln(arquivoCSV, linha);
-    ASQLInsert := 'insert table ' + EditNomeTabela.text + '(' + linha;
+
+    if ATabelaExistente then
+    begin
+      linha := EmptyStr;
+      DM.FDQueryColunas.Close;
+      DM.FDQueryColunas.ParamByName('pTabela').AsString := EditNomeTabela.text;
+      DM.FDQueryColunas.Open;
+
+      DM.FDQueryColunas.First;
+      while DM.FDQueryColunas.Eof do
+      begin
+        if I < DM.FDQueryColunas.RecordCount - 1 then
+          linha := linha + DM.FDQueryColunas.FieldByName('RDB$RELATION_FIELD')
+            .AsString + ','
+        else
+          linha := linha + DM.FDQueryColunas.FieldByName
+            ('RDB$RELATION_FIELD').AsString;
+        inc(I);
+      end;
+
+    end;
+    OriginalString := linha;
+    SubStringToFind := 'date,';
+    SubStringToReplace := 'data,';
+    OriginalString := StringReplace(OriginalString, SubStringToFind,
+      SubStringToReplace, [rfReplaceAll, rfIgnoreCase]);
+
+    ASQLInsert := 'insert into ' + EditNomeTabela.text + '(' + OriginalString;
     while not Eof(arquivoCSV) do
     begin
       Readln(arquivoCSV, linha);
@@ -103,7 +137,7 @@ begin
   Except
     on E: Exception do
     begin
-      Geralog(Sender, E.Message);
+      Geralog('btnImportarClick', E.Message);
       ShowMessage('Erro ao executar comando de creação da tabela ' + E.Message);
       Close;
     end;
@@ -151,6 +185,7 @@ procedure TfrmPrincipal.DBGrid1DblClick(Sender: TObject);
 begin
   EditNomeTabela.text := DM.FDQueryBancoRDBRELATION_NAME.AsString;
   btnImportar.Enabled := True;
+  ATabelaExistente := True;
 end;
 
 procedure TfrmPrincipal.EditNomeTabelaExit(Sender: TObject);
@@ -163,14 +198,17 @@ begin
 
 end;
 
-procedure TfrmPrincipal.Geralog(Sender: TObject;_AMensagem: string);
+procedure TfrmPrincipal.FormShow(Sender: TObject);
+begin
+  ATabelaExistente := False;
+end;
+
+procedure TfrmPrincipal.Geralog(_AOrigem, _AMensagem: string);
 var
   ACaminho: string;
   APath: string;
   arq: TextFile;
-  ClassRef: TComponent;
 begin
-  ClassRef := TComponent(Sender).Components[0].Owner;
   ACaminho := ExtractFileDir(GetCurrentDir);
   APath := ACaminho + '\arquivo.log';
 
@@ -179,7 +217,7 @@ begin
     Rewrite(arq, APath);
   Append(arq);
 
-  Writeln(arq,ClassRef.ToString +'-'+ _AMensagem);
+  Writeln(arq, _AOrigem + '-' + _AMensagem);
   Writeln(arq, '');
   CloseFile(arq);
 end;
@@ -221,15 +259,15 @@ begin
     end;
   end;
   try
-    Geralog(nil, ASQLCreate);
-    DM.FDQuery1.Close;
-    DM.FDQuery1.SQL.Add(ASQLCreate);
-    DM.FDQuery1.ExecSQL;
+    Geralog('MontarCreate', ASQLCreate);
+    DM.FDQueryMontarSQL.Close;
+    DM.FDQueryMontarSQL.SQL.Add(ASQLCreate);
+    DM.FDQueryMontarSQL.ExecSQL;
     ShowMessage('Sucesso na criação da tabela ' + EditNomeTabela.text);
   Except
     on E: Exception do
     begin
-      Geralog(nil, E.Message);
+      Geralog('MontarCreate', E.Message);
       ShowMessage('Erro ao executar comando de creação da tabela ' + E.Message);
       Close;
     end;
@@ -242,13 +280,16 @@ var
   I: Integer;
 begin
   Asaida := TStringList.Create;
-  ASQLInsert := ASQLInsert + 'values(';
+  ASQLInsert := ASQLInsert + ') values (';
   ExtractStrings([','], [], PChar(_ALinha), Asaida);
 
   for I := 0 to Asaida.Count - 1 do
   begin
     if Asaida.Count >= 1 then
     begin
+      if not IsNumeric(Asaida[I]) then
+        Asaida[I] := QuotedStr(Asaida[I]);
+
       if I < Asaida.Count - 1 then
         ASQLInsert := ASQLInsert + Asaida[I] + ', '
       else
@@ -256,20 +297,27 @@ begin
     end;
   end;
   try
-    Geralog(nil, ASQLInsert);
-    DM.FDQuery1.Close;
-    DM.FDQuery1.SQL.Add(ASQLInsert);
-    DM.FDQuery1.ExecSQL;
+    Geralog('MontarInsert', ASQLInsert);
+    DM.FDQueryMontarSQL.Close;
+    DM.FDQueryMontarSQL.SQL.Add(ASQLInsert);
+    DM.FDQueryMontarSQL.ExecSQL;
 
   Except
     on E: Exception do
     begin
-      Geralog(nil, E.Message);
+      Geralog('MontarInsert', E.Message);
       ShowMessage('Erro ao executar comando de insert da tabela ' + E.Message);
       Close;
     end;
   end;
 
+end;
+
+function TfrmPrincipal.IsNumeric(const Value: string): Boolean;
+var
+  IntValue: Integer;
+begin
+  Result := TryStrToInt(Value, IntValue);
 end;
 
 end.
